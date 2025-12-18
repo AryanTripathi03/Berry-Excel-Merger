@@ -1,0 +1,17 @@
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+env/
+
+# OS / system files
+.DS_Store
+Thumbs.db
+
+# IDE / editor folders
+.vscode/
+.idea/
