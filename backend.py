@@ -4,21 +4,15 @@ import pandas as pd
 import tempfile
 from typing import List
 
-from fastapi.staticfiles import StaticFiles
+
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FRONTEND_DIR = os.path.join(BASE_DIR, "..", "Frontend")
 
-app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
-@app.get("/")
-async def serve_frontend():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 
 # CORS
@@ -191,3 +185,18 @@ async def upload(files: List[UploadFile] = File(...)):
 async def root():
     return {"message": "Backend is running",
             "routes": ["/api/login/", "/api/upload/"]}
+    
+    
+    
+import os
+from fastapi import FastAPI
+
+app = FastAPI()
+
+# your routes above
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("backend:app", host="0.0.0.0", port=port)
+    
