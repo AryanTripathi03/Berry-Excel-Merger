@@ -191,7 +191,6 @@ async def root():
 import os
 from fastapi import FastAPI
 
-app = FastAPI()
 
 # your routes above
 
