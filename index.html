@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel File Merger & Downloader</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for appearance */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f2f5 0%, #e0e6ec 100%);
+            min-height: 100vh;
+        }
+        .container-card {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), 0 3px 6px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease-in-out;
+        }
+        .container-card:hover {
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15), 0 5px 10px rgba(0, 0, 0, 0.08);
+        }
+        .btn-primary {
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #1e40af; /* Darker blue for hover */
+            transform: translateY(-1px);
+        }
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        .file-label {
+            border: 2px dashed #9ca3af;
+            transition: all 0.2s;
+        }
+        .file-label:hover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+
+    <!-- Main Application Container -->
+    <div id="app" class="w-full max-w-lg mx-auto bg-white p-8 md:p-10 rounded-xl container-card">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Excel Merge Tool</h1>
+        
+        <!-- Status/Error Message Area -->
+        <div id="message-box" class="mb-4 hidden p-3 rounded-lg text-sm" role="alert"></div>
+
+        <!-- 1. Login Form (Initial View) -->
+        <form id="login-form" class="space-y-4">
+            <h2 class="text-xl font-semibold text-gray-700 border-b pb-2 mb-4">User Login</h2>
+            <div>
+                <label for="user-id" class="block text-sm font-medium text-gray-700 mb-1">User ID</label>
+                <input type="text" id="user-id" name="user_id" required 
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="e.g., aryan or admin">
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input type="password" id="password" name="password" required
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="e.g., mypassword123 or adminpass">
+            </div>
+            <button type="submit" id="login-btn" class="w-full btn-primary bg-blue-600 text-white p-3 rounded-lg font-semibold shadow-md hover:bg-blue-700">
+                Login
+            </button>
+        </form>
+
+        <!-- 2. File Upload Form (Visible After Login) -->
+        <div id="upload-section" class="space-y-6 hidden">
+            <h2 class="text-xl font-semibold text-gray-700 border-b pb-2 mb-4">Upload Files to Merge</h2>
+            
+            <form id="upload-form" enctype="multipart/form-data">
+                <div class="mb-6">
+                    <label for="excel-files" class="block text-sm font-medium text-gray-700 mb-2">Select Two or More Excel Files (.xls, .xlsx)</label>
+                    <label for="excel-files" class="file-label flex flex-col items-center justify-center p-6 text-center rounded-lg cursor-pointer">
+                        <svg class="w-8 h-8 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4.974V17a3 3 0 01-3 3H7a3 3 0 01-3-3v-7a1 1 0 011-1h.5a1 1 0 001-1V9a3 3 0 013-3h1m3 9l3-3m0 0l-3-3m3 3H9"></path></svg>
+                        <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
+                        <p id="file-count" class="text-xs text-gray-400">0 files selected</p>
+                        <input type="file" id="excel-files" name="files" accept=".xls,.xlsx" multiple required class="hidden" />
+                    </label>
+                </div>
+                
+                <button type="submit" id="upload-btn" class="w-full btn-primary bg-green-600 text-white p-3 rounded-lg font-semibold shadow-md hover:bg-green-700">
+                    <span id="btn-text">Merge and Download</span>
+                </button>
+            </form>
+
+            <!-- Download Link Area -->
+            <div id="download-area" class="mt-4 p-4 bg-yellow-50 rounded-lg hidden">
+                <p class="text-center font-medium text-yellow-800 mb-3">Merge Complete!</p>
+                <a id="download-link" href="#" class="w-full block text-center bg-yellow-600 text-white p-3 rounded-lg font-semibold hover:bg-yellow-700" download="Merged_Furnaces.xlsx">
+                    Click to Download Merged File
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Configuration (Explicitly set backend URL) ---
+        // This is the address where your Python server must be running.
+        const API_BASE_URL = 'https://berry-excel-merger.onrender.com';
+        const LOGIN_URL = `${API_BASE_URL}/api/login/`;
+        const UPLOAD_URL = `${API_BASE_URL}/api/upload/`;
+
+        // DOM Elements (same as before)
+        const loginForm = document.getElementById('login-form');
+        const uploadSection = document.getElementById('upload-section');
+        const uploadForm = document.getElementById('upload-form');
+        const excelFilesInput = document.getElementById('excel-files');
+        const loginBtn = document.getElementById('login-btn');
+        const uploadBtn = document.getElementById('upload-btn');
+        const btnText = document.getElementById('btn-text');
+        const fileCountDisplay = document.getElementById('file-count');
+        const messageBox = document.getElementById('message-box');
+        const downloadArea = document.getElementById('download-area');
+        const downloadLink = document.getElementById('download-link');
+
+        let isLoggedIn = false;
+
+        // --- Utility Functions ---
+
+        /** Displays messages in the dedicated message box. */
+        function showMessage(message, type = 'info') {
+            messageBox.textContent = message;
+            messageBox.className = 'mb-4 p-3 rounded-lg text-sm';
+            messageBox.classList.remove('hidden');
+
+            switch (type) {
+                case 'success':
+                    messageBox.classList.add('bg-green-100', 'text-green-800');
+                    break;
+                case 'error':
+                    messageBox.classList.add('bg-red-100', 'text-red-800');
+                    break;
+                case 'info':
+                default:
+                    messageBox.classList.add('bg-blue-100', 'text-blue-800');
+                    break;
+            }
+        }
+
+        /** Hides the message box. */
+        function hideMessage() {
+            messageBox.classList.add('hidden');
+        }
+
+        /** Updates the UI state (show login or upload form) */
+        function updateUI() {
+            if (isLoggedIn) {
+                loginForm.classList.add('hidden');
+                uploadSection.classList.remove('hidden');
+                showMessage("Login successful. Ready to upload files.", 'success');
+            } else {
+                loginForm.classList.remove('hidden');
+                uploadSection.classList.add('hidden');
+                downloadArea.classList.add('hidden');
+            }
+            // Hiding messages on context switch helps prevent stale messages
+            if (!isLoggedIn) hideMessage();
+        }
+
+        // --- Event Handlers ---
+
+        /** Handles the Login form submission. */
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideMessage();
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+
+            const formData = new FormData(loginForm);
+            
+            try {
+                const response = await fetch(LOGIN_URL, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    isLoggedIn = true;
+                    updateUI();
+                } else {
+                    // This handles status codes like 401 (Unauthorized)
+                    showMessage(`Login failed: ${result.detail || 'Invalid credentials.'}`, 'error');
+                }
+            } catch (error) {
+                // This handles network errors (the CORS issue you had before)
+                showMessage(`Network error: Could not connect to the server. Check if the backend is running at ${API_BASE_URL}.`, 'error');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Login';
+            }
+        });
+
+        /** Updates file count displayed in the upload label. */
+        excelFilesInput.addEventListener('change', () => {
+            const fileCount = excelFilesInput.files.length;
+            fileCountDisplay.textContent = `${fileCount} file(s) selected`;
+            
+            // Show info message if less than 2 files are selected
+            if (fileCount < 2 && fileCount > 0) {
+                 showMessage("Please select at least two Excel files to merge.", 'info');
+            } else if (fileCount >= 2) {
+                hideMessage();
+            }
+        });
+
+        /** Handles the File Upload form submission. */
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideMessage();
+            downloadArea.classList.add('hidden');
+
+            const files = excelFilesInput.files;
+            if (files.length < 2) {
+                showMessage("Please select at least two files.", 'error');
+                return;
+            }
+            
+            uploadBtn.disabled = true;
+            btnText.textContent = 'Merging... Please wait.';
+            uploadBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+            uploadBtn.classList.add('bg-yellow-600');
+
+            const formData = new FormData();
+            for (const file of files) {
+                formData.append('files', file);
+            }
+
+            try {
+                // Fetch call to the upload endpoint
+                const response = await fetch(UPLOAD_URL, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    // Create a Blob from the file data returned by the server
+                    const blob = await response.blob();
+                    
+                    // Extract filename from Content-Disposition header if available
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'Merged_Furnaces.xlsx';
+                    if (contentDisposition && contentDisposition.indexOf('filename=') !== -1) {
+                        // Simple regex to extract the filename from the header
+                        filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+
+                    const url = window.URL.createObjectURL(blob);
+                    
+                    downloadLink.href = url;
+                    downloadLink.download = filename; // Set the filename for download
+                    downloadArea.classList.remove('hidden');
+                    showMessage(`Successfully merged ${files.length} files! Click below to download.`, 'success');
+
+                    // Clean up URL object after a short delay to free memory
+                    setTimeout(() => window.URL.revokeObjectURL(url), 60000); 
+
+                } else {
+                    const errorJson = await response.json();
+                    showMessage(`Merge failed: ${errorJson.detail || 'An unknown error occurred during merging.'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Upload/Merge Error:', error);
+                showMessage(`Network or processing error: ${error.message}. Make sure the backend is running.`, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                btnText.textContent = 'Merge and Download';
+                uploadBtn.classList.remove('bg-yellow-600');
+                uploadBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+            }
+        });
+
+        // Initial UI setup
+        document.addEventListener('DOMContentLoaded', updateUI);
+    </script>
+</body>
+</html>
